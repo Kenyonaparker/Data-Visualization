@@ -1,0 +1,74 @@
+library(dplyr)
+library(ggplot2)
+library(ggmap)
+library(htmltools)
+library(leaflet)
+library(sp)
+library(rgdal)
+
+
+#Make my map
+#
+m <- setView(addTiles(leaflet()), lng= -95.7129, lat= 37.0902, zoom = 4)
+m
+#add tiles to my map
+m <- leaflet() %>% addProviderTiles(providers$Stamen.Toner) %>% 
+  setView(lng= -95.7129, lat= 37.0902, zoom = 4)
+m
+
+income <- read.csv("data/the percentages of black and white people grossing 200K.csv")
+View(income)
+
+
+income$label <- paste("<p>", income$Top_States, "" ,income$Total.population,"<p>",
+                      "<p>", income$AllRaces, "" , income$All..200K,"<p>",
+                      "<p>", income$B.Pop, "" , income$Black.Pop,"<p>",
+                      "<p>", income$B.Race, "" , income$Black..200K,"<p>",
+                      "<p>", income$W.Pop, "" , income$White.Pop,"<p>",
+                      "<p>", income$W.Race, "" , income$White..200K,"<p>")
+
+
+m <- leaflet() %>% addProviderTiles(providers$Wikimedia) %>% 
+  setView(lng= -95.7129, lat= 37.0902, zoom = 4) %>%
+ addCircles(lng = income$Longitude, lat = income$Latitude, radius = 1, 
+            weight = 24, color = "#03F",fillColor ="ffffff",
+            label = lapply(income$label,HTML),
+            labelOptions(noHide = T, direction = "bottom",
+                         style=list("font-size"="14px")))
+m
+
+
+View(income)
+
+cmap <- income
+  
+states <- readOGR("data/cb_2016_us_state_500k.shp")  
+states <- subset(states, is.element(states$NAME, cmap$Top_States))
+
+cmap <- cmap[order(match(cmap$Top_States, states$NAME)),]
+
+bins <- c(0.5,1.0,1.5, 2.0, 2.5, 3.0, 3.5,4.0,4.5,5.0, 5.5)
+pal <- colorBin("RdYlBu", domain = cmap$All..200K, bins = bins)
+
+m <- leaflet() %>%
+  addProviderTiles(providers$Stamen.TonerLabels)%>%
+  setView(lng= -95.7129, lat= 37.0902, zoom = 4)%>%
+   addPolygons(data=states,weight=1, smoothFactor = 0.5, color = "white",
+              fillOpacity = 0.8, fillColor = pal(cmap$All..200K),label = 
+                lapply(labels,HTML))%>%
+                addLegend(pal=pal,values = cmap$All..200K, opacity = 0.7, 
+                position = "topright", title = "Percentages of All Races") 
+            
+             
+m
+labels <- paste("<p>", cmap$Top_States, "" ,cmap$Total.population,"<p>",
+                      "<p>", cmap$AllRaces, "" , cmap$All..200K,"<p>",
+                      "<p>", cmap$B.Pop, "" , cmap$Black.Pop,"<p>",
+                      "<p>", cmap$B.Race, "" , cmap$Black..200K,"<p>",
+                      "<p>", cmap$W.Pop, "" , cmap$White.Pop,"<p>",
+                      "<p>", cmap$W.Race, "" , cmap$White..200K,"<p>")
+
+
+
+library(htmlwidgets)
+saveWidget(m, file = "dynamic_map.html")
